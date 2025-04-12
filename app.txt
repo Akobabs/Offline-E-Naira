@@ -1,0 +1,107 @@
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/ussd', methods=['POST'])
+def ussd():
+    # Get USSD input from request
+    session_id = request.form.get('sessionId', '12345')
+    phone_number = request.form.get('phoneNumber', '08012345678')
+    text = request.form.get('text', '')
+
+    # Split input to handle multi-level menus (e.g., "1*12345*100")
+    inputs = text.split('*') if text else []
+
+    # Main menu
+    if not inputs:
+        response = "CON Welcome to eNaira Offline\n1. Send Money\n2. Check Balance\n3. View Transactions"
+    # Send Money flow
+    elif inputs[0] == '1':
+        if len(inputs) == 1:
+            response = "CON Enter Recipient ID:"
+        elif len(inputs) == 2:
+            response = "CON Enter Amount:"
+        elif len(inputs) == 3:
+            response = f"END Transaction initiated: Send {inputs[2]} Naira to ID {inputs[1]}"
+    # Check Balance
+    elif inputs[0] == '2':
+        response = "END Your balance is 5000 Naira"  # Mock balance
+    # View Transactions
+    elif inputs[0] == '3':
+        response = "END No transactions yet"  # Mock response
+    else:
+        response = "END Invalid option"
+
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+from flask import Flask, request, jsonify
+from database import init_db, get_user, save_transaction, get_transactions
+from crypto import encrypt_data
+import json
+
+app = Flask(__name__)
+
+init_db()
+
+@app.route('/ussd', methods=['POST'])
+def ussd():
+    session_id = request.form.get('sessionId', '12345')
+    phone_number = request.form.get('phoneNumber', '08012345678')
+    text = request.form.get('text', '')
+
+    inputs = text.split('*') if text else []
+    user = get_user(phone_number)
+
+    if not user:
+        return jsonify({'response': "END User not found"})
+
+    if not inputs:
+        response = "CON Welcome to eNaira Offline\n1. Send Money\n2. Check Balance\n3. View Transactions"
+    elif inputs[0] == '1':
+        if len(inputs) == 1:
+            response = "CON Enter Recipient ID:"
+        elif len(inputs) == 2:
+            response = "CON Enter Amount:"
+        elif len(inputs) == 3:
+            amount = float(inputs[2])
+            if amount > user[2]:
+                response = "END Insufficient balance"
+            else:
+                tx_data = {
+                    "sender_id": user[0],
+                    "recipient_id": inputs[1],
+                    "amount": amount,
+                    "timestamp": "2025-04-11T12:00:00"
+                }
+                encrypted_tx = encrypt_data(tx_data)
+                with open(f'data/tx_{session_id}.json', 'w') as f:
+                    json.dump(encrypted_tx, f)
+                save_transaction(user[0], inputs[1], amount)
+                response = f"END Transaction initiated: Send {amount} Naira to ID {inputs[1]}"
+    elif inputs[0] == '2':
+        response = f"END Your balance is {user[2]} Naira"
+    elif inputs[0] == '3':
+        transactions = get_transactions(user[0])
+        if not transactions:
+            response = "END No transactions found"
+        else:
+            tx_list = []
+            for tx in transactions[:3]:  # Limit to 3 for simplicity
+                if tx[1] == user[0]:
+                    tx_str = f"Sent {tx[3]} Naira to {tx[2]} on {tx[4][:10]}"
+                else:
+                    tx_str = f"Received {tx[3]} Naira from {tx[1]} on {tx[4][:10]}"
+                tx_list.append(tx_str)
+            response = "END " + "\n".join(tx_list)
+    else:
+        response = "END Invalid option"
+
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
