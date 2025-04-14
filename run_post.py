@@ -33,8 +33,8 @@ response5 = requests.post(url, data={**data, "text": "2"})
 print("Step 5 Status Code:", response5.status_code)
 print("Step 5 Response:", response5.text)
 
-# Wait briefly to reduce contention
-time.sleep(0.2)
+# Wait to reduce contention
+time.sleep(0.5)
 
 # Step 6: Sync transactions
 response6 = requests.post(url, data={**data, "text": "4"})

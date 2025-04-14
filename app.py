@@ -1,5 +1,5 @@
-from flask import Flask, request, jsonify
-from database import init_db, get_user, get_user_by_id, save_transaction, get_transactions, complete_transaction, get_db_connection
+from flask import Flask, request, jsonify, render_template
+from database import init_db, get_user, get_user_by_id, save_transaction, get_transactions, complete_transaction, get_db_connection_flask, close_db_connection
 from crypto import encrypt_data, decrypt_data
 import json
 import os
@@ -11,6 +11,14 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 init_db()
+
+@app.teardown_appcontext
+def teardown_db(exception):
+    close_db_connection()
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/ussd', methods=['POST'])
 def ussd():
@@ -97,24 +105,21 @@ def ussd():
                     logger.debug("Decrypting transaction...")
                     tx_data = decrypt_data(encrypted_tx)
                     logger.debug(f"Decrypted data: {tx_data}")
-                    conn = get_db_connection()  # Use consistent connection
-                    try:
-                        cursor = conn.cursor()
-                        cursor.execute('SELECT id FROM transactions WHERE sender_id = ? AND recipient_id = ? AND amount = ? AND status = ?',
-                                       (tx_data['sender_id'], tx_data['recipient_id'], tx_data['amount'], 'pending'))
-                        tx = cursor.fetchone()
-                        logger.debug(f"Database query result: {tx}")
-                        if tx:
-                            logger.debug(f"Completing transaction ID {tx[0]}")
-                            complete_transaction(tx[0], tx_data['sender_id'], tx_data['recipient_id'], tx_data['amount'])
-                            logger.debug(f"Deleting file: {tx_file}")
-                            os.remove(tx_file)
-                            response = "END Transactions synced successfully"
-                        else:
-                            logger.debug("No matching pending transaction found")
-                            response = "END No pending transactions found"
-                    finally:
-                        conn.close()
+                    conn = get_db_connection_flask()
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT id FROM transactions WHERE sender_id = ? AND recipient_id = ? AND amount = ? AND status = ?',
+                                   (tx_data['sender_id'], tx_data['recipient_id'], tx_data['amount'], 'pending'))
+                    tx = cursor.fetchone()
+                    logger.debug(f"Database query result: {tx}")
+                    if tx:
+                        logger.debug(f"Completing transaction ID {tx[0]}")
+                        complete_transaction(tx[0], tx_data['sender_id'], tx_data['recipient_id'], tx_data['amount'])
+                        logger.debug(f"Deleting file: {tx_file}")
+                        os.remove(tx_file)
+                        response = "END Transactions synced successfully"
+                    else:
+                        logger.debug("No matching pending transaction found")
+                        response = "END No pending transactions found"
                 except Exception as e:
                     logger.error(f"Sync error: {str(e)}")
                     response = f"END Sync failed: {str(e)}"
