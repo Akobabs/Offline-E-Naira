@@ -1,4 +1,3 @@
-enaira.db
 data/
 venv/
 __pycache__/
@@ -14,4 +13,4 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
-
+*.db
