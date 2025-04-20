@@ -75,6 +75,7 @@ Navigate options:
 
 Use:
 ⌫ for backspace
+
 ↺ to reset input
 
 ### Command-line Simulator
@@ -119,5 +120,7 @@ MIT License – See LICENSE for details.
 
 ## 📫 Contact
 Built by ADEMOLA, Akorede Adejare
+
 Project URL: github.com/Akobabs/Offline-E-Naira
+
 Email: Akorede[dot]ademola[at]yahoo[dot]com
